@@ -1,0 +1,6 @@
+langchain-google-genai==3.1.0
+langgraph==1.0.3
+git+https://github.com/QuinRiva/trustcall.git
+google-cloud-aiplatform==1.128.0
+langchain-google-vertexai==3.1.0
+python-dotenv==1.2.1
