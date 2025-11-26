@@ -1,10 +1,10 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 from trustcall import create_extractor
 from langchain_google_genai import ChatGoogleGenerativeAI
-from .utils import get_trustcall_message
+from src.maistro.utils import get_trustcall_message
 from dotenv import load_dotenv
-from . import states
-from . import prompts
+from src.maistro import states
+from src.maistro import prompts
 
 
 load_dotenv()

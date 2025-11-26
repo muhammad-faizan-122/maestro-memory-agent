@@ -1,7 +1,7 @@
 from langgraph.store.base import BaseStore
 from datetime import datetime
 from langchain_core.messages import merge_message_runs, SystemMessage
-from . import prompts
+from src.maistro import prompts
 import uuid
 from langchain_core.messages import AIMessage
 
@@ -108,8 +108,10 @@ def retrieve_todo(store: BaseStore, user_id):
     """Retrieve todo memory from the store"""
     try:
         namespace = ("todo", user_id)
+        print("namespace todo: ", namespace)
         memories = store.search(namespace)
         todo = "\n".join(f"{mem.value}" for mem in memories)
+        print("todo: ")
         return todo
     except Exception as e:
         print(f"Error retrieving todo: {e}")

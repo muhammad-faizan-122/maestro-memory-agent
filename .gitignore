@@ -1,10 +1,11 @@
 # Environment variables
 .env
 
-# Python cache
+# cache directory
 *__pycache__/
 *.pyc
 *.vscode/
+.langgraph_api/
 
 # Vector Store - DO NOT COMMIT
 chroma_db/

@@ -1,18 +1,20 @@
-from . import llm_utils
-from . import utils
+from src.maistro import llm_utils
+from src.maistro import utils
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.graph import StateGraph, MessagesState, END, START
 from langchain_core.runnables import RunnableConfig
 from langgraph.store.base import BaseStore
 from typing import Literal
+from src.maistro import configurations
 
 
 def task_mAIstro(state: MessagesState, config: RunnableConfig, store: BaseStore):
     """Load memories from the store and use them to personalize the chatbot's response."""
-    memories = utils.retrieve_all_memories(
-        store, user_id=config["configurable"]["user_id"]
-    )
+    configurable = configurations.Configuration.from_runnable_config(config)
+    user_id = configurable.user_id
+
+    memories = utils.retrieve_all_memories(store, user_id=user_id)
     response = llm_utils.find_memory_type(state["messages"], memories)
     return {"messages": [response]}
 
@@ -20,9 +22,12 @@ def task_mAIstro(state: MessagesState, config: RunnableConfig, store: BaseStore)
 def update_todos(state: MessagesState, config: RunnableConfig, store: BaseStore):
     """Reflect on the chat history and update the memory collection."""
     tool_name = "ToDo"
+    configurable = configurations.Configuration.from_runnable_config(config)
+    user_id = configurable.user_id
 
+    print("config (tod): ", user_id)
     # retrieve existing ToDo items
-    existing_items = utils.retrieve_todo(store, config["configurable"]["user_id"])
+    existing_items = utils.retrieve_todo(store, user_id)
 
     # Format the existing memories for the Trustcall extractor
     existing_memories = utils.format_existing_memories(existing_items, tool_name)
@@ -42,7 +47,7 @@ def update_todos(state: MessagesState, config: RunnableConfig, store: BaseStore)
     utils.save_memories(
         store,
         result,
-        namespace=("todo", config["configurable"]["user_id"]),
+        namespace=("todo", user_id),
     )
 
     # Respond to the tool call made in task_mAIstro, confirming the update
@@ -66,10 +71,13 @@ def update_profile(state: MessagesState, config: RunnableConfig, store: BaseStor
     tool_name = "Profile"
 
     # Get the user ID from the config
-    user_id = config["configurable"]["user_id"]
-
+    configurable = configurations.Configuration.from_runnable_config(config)
+    user_id = configurable.user_id
+    print("user id: ", user_id)
+    if not user_id:
+        print("configs: ", config)
     # Define the namespace for the memories
-    namespace = ("profile", user_id)
+    namespace = (user_id, "profile")
 
     # retrieve existing profile items
     existing_items = utils.retrieve_user_profile(store, user_id, namespace)
@@ -101,7 +109,8 @@ def update_instructions(state: MessagesState, config: RunnableConfig, store: Bas
     """Reflect on the chat history and update the memory collection."""
 
     # Get the user ID from the config
-    user_id = config["configurable"]["user_id"]
+    configurable = configurations.Configuration.from_runnable_config(config)
+    user_id = configurable.user_id
 
     # Define the namespace for the memories
     namespace = ("instructions", user_id)
@@ -156,31 +165,26 @@ def route_message(
             raise ValueError
 
 
-def build_graph():
-    # Create the graph + all nodes
-    builder = StateGraph(MessagesState)
+# Create the graph + all nodes
+builder = StateGraph(MessagesState, context_schema=configurations.Configuration)
 
-    # Define the flow of the memory extraction process
-    builder.add_node(task_mAIstro)
-    builder.add_node(update_todos)
-    builder.add_node(update_profile)
-    builder.add_node(update_instructions)
+# Define the flow of the memory extraction process
+builder.add_node(task_mAIstro)
+builder.add_node(update_todos)
+builder.add_node(update_profile)
+builder.add_node(update_instructions)
 
-    builder.add_edge(START, "task_mAIstro")
-    builder.add_conditional_edges("task_mAIstro", route_message)
-    builder.add_edge("update_todos", "task_mAIstro")
-    builder.add_edge("update_profile", "task_mAIstro")
-    builder.add_edge("update_instructions", "task_mAIstro")
+builder.add_edge(START, "task_mAIstro")
+builder.add_conditional_edges("task_mAIstro", route_message)
+builder.add_edge("update_todos", "task_mAIstro")
+builder.add_edge("update_profile", "task_mAIstro")
+builder.add_edge("update_instructions", "task_mAIstro")
 
-    # Store for long-term (across-thread) memory
-    across_thread_memory = InMemoryStore()
+# Store for long-term (across-thread) memory
+across_thread_memory = InMemoryStore()
 
-    # Checkpointer for short-term (within-thread) memory
-    within_thread_memory = MemorySaver()
+# Checkpointer for short-term (within-thread) memory
+within_thread_memory = MemorySaver()
 
-    # We compile the graph with the checkpointer and store
-    graph = builder.compile(
-        checkpointer=within_thread_memory,
-        store=across_thread_memory,
-    )
-    return graph
+# We compile the graph with the checkpointer and store
+graph = builder.compile()
